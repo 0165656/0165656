@@ -1,0 +1,1713 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>星际战机 - 强化版</title>
+    <style>
+        /* 样式保持不变 */
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box; 
+            user-select: none; 
+            -webkit-user-select: none; 
+        }
+        body { 
+            overflow: hidden; 
+            height: 100vh; 
+            background: #000; 
+            color: white; 
+            font-family: Arial, sans-serif;
+            -webkit-user-drag: none;
+            user-drag: none;
+        }
+        canvas { display: block; }
+        #startScreen { 
+            position: fixed; 
+            top: 0; left: 0; right: 0; bottom: 0; 
+            background: rgba(0,0,0,0.85); 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            z-index: 100;
+            padding: 20px;
+        }
+        #startBtn { 
+            padding: 15px 30px; 
+            font-size: 20px; 
+            background: #0066cc; 
+            color: white; 
+            border: none; 
+            cursor: pointer; 
+            margin-top: 20px;
+            border-radius: 5px;
+            transition: transform 0.1s;
+        }
+        #startBtn:active { transform: scale(0.95); }
+        #gameUI { 
+            position: fixed; 
+            top: 10px; 
+            left: 10px; 
+            right: 10px;
+            color: white; 
+            z-index: 50;
+            display: none; 
+            justify-content: space-between;
+        }
+        .ui-group { display: flex; gap: 15px; }
+        .ui-item { 
+            background: rgba(0,0,0,0.5); 
+            padding: 5px 10px; 
+            border-radius: 3px; 
+            font-weight: bold;
+        }
+        #healthDisplay {
+            color: #ff4757;
+            border: 1px solid #ff4757;
+        }
+        #missileDisplay {
+            color: #ffdd59;
+            border: 1px solid #ffdd59;
+        }
+        #flareCD {
+            color: #1e90ff;
+            border: 1px solid #1e90ff;
+        }
+        #pauseScreen, #gameOverScreen { 
+            position: fixed; 
+            top: 0; left: 0; right: 0; bottom: 0; 
+            background: rgba(0,0,0,0.85); 
+            display: none; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            z-index: 100;
+            padding: 20px;
+        }
+        .pause-btn, .restart-btn {
+            margin: 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+            background: #0066cc;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.7);
+            padding: 10px 15px;
+            border-radius: 5px;
+            z-index: 100;
+            transform: translateX(120%);
+            transition: transform 0.3s;
+        }
+        #abilityCDs {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            z-index: 50;
+        }
+        .ability-item {
+            background: rgba(0,0,0,0.7);
+            padding: 8px 12px;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid #444;
+        }
+        .ability-key {
+            background: #333;
+            width: 24px;
+            height: 24px;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+        .ability-cd {
+            color: #ff4757;
+        }
+        .missile-lock {
+            position: fixed;
+            pointer-events: none;
+            z-index: 40;
+            color: #ffdd59;
+            font-size: 24px;
+            text-shadow: 0 0 10px rgba(255,221,89,0.8);
+        }
+        #weaponBoostIcon {
+            color: #9b59b6;
+            border: 1px solid #9b59b6;
+            display: none;
+        }
+    </style>
+</head>
+<body oncontextmenu="return false" oncopy="return false" oncut="return false" onpaste="return false" onselectstart="return false">
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="startScreen">
+        <h1>星际战机 - 强化版</h1>
+        <p style="margin: 10px 0; color: #4cd137;">作者：0165656,豆包</p>
+        <p style="margin: 20px 0;">导弹可掉头追击 | 得分翻10倍 | 射速提升 | 护盾完全免疫</p>
+        <div style="max-width: 500px; background: rgba(255,255,255,0.1); padding: 15px; border-radius: 5px;">
+            <h3 style="margin-bottom: 10px; color: #ff4757;">强化特性</h3>
+            <p>• 玩家导弹可180°掉头持续追击敌人</p>
+            <p>• 所有击杀得分提升10倍</p>
+            <p>• 机炮射速提升至每秒20发</p>
+            <p>• 护盾可完全免疫一次伤害（包括碰撞）</p>
+            <h3 style="margin: 15px 0 10px; color: #1e90ff;">操作</h3>
+            <p>• AWSD键：控制战机移动</p>
+            <p>• 鼠标左键：发射机炮（每秒20发）</p>
+            <p>• 鼠标右键：发射追踪导弹（可掉头）</p>
+            <p>• Y键：热诱弹（清除所有敌弹和自杀式攻击机，无冷却）</p>
+            <p>• P键：暂停游戏</p>
+            <p>• E键：消耗500分召唤炸弹小飞机（无冷却）</p>
+            <p>• R键：消耗1000分激活护盾（获得护盾机效果，无冷却）</p> <!-- 变更说明 -->
+            <p>• F键：消耗800分激活过载引擎（永久生效，仅一次）</p> <!-- 变更说明 -->
+            <p>• Q键：消耗700分投放EMP炸弹（控制时长10秒，无冷却）</p> <!-- 变更说明 -->
+            <h3 style="margin: 15px 0 10px; color: #9b59b6;">新增内容</h3>
+            <p>• 精英敌机：高生命值，停留在顶端发射直线子弹，掉落能量核心</p>
+            <p>• 能量核心：暂时强化武器威力，提升伤害</p>
+            <p>• 突袭机：直接撞击玩家而非发射子弹</p>
+            <p>• 火箭集群：导弹无目标时围绕玩家，伤害为机炮3倍</p> <!-- 新增说明 -->
+        </div>
+        <button id="startBtn">开始任务</button>
+    </div>
+    
+    <div id="pauseScreen">
+        <h2>任务暂停</h2>
+        <button class="pause-btn" id="resumeBtn">继续任务</button>
+        <button class="pause-btn" id="quitBtn">退出任务</button>
+    </div>
+    
+    <div id="gameOverScreen">
+        <h2>任务失败</h2>
+        <p>最终得分: <span id="finalScore">0</span></p>
+        <p>最高等级: <span id="finalLevel">1</span></p>
+        <button class="restart-btn" id="restartBtn">重新开始</button>
+    </div>
+    
+    <div id="gameUI">
+        <div class="ui-group">
+            <div class="ui-item" id="healthDisplay">生命: <span id="health">3</span></div>
+            <div class="ui-item">得分: <span id="score">0</span></div>
+            <div class="ui-item">等级: <span id="level">1</span></div>
+            <div class="ui-item" id="shieldIcon" style="display: none;">护盾激活</div>
+            <div class="ui-item" id="spreadIcon" style="display: none;">散射: <span id="spreadTimer">15s</span></div>
+            <div class="ui-item" id="overloadIcon" style="display: none; color: #ff3333;">过载引擎激活</div> <!-- 变更：移除计时器 -->
+            <div class="ui-item" id="weaponBoostIcon">武器强化: <span id="weaponBoostTimer">8s</span></div>
+        </div>
+        <div class="ui-group">
+            <div class="ui-item" id="missileDisplay">导弹: <span id="missiles">10</span>/10</div>
+            <div class="ui-item" id="flareCD">热诱弹: <span id="flareCDText">就绪</span></div>
+        </div>
+    </div>
+
+    <div class="toast" id="missileToast">导弹补给 +5!</div>
+    <div class="toast" id="clusterToast">火箭集群激活!发射15枚追踪弹!</div>
+    <div class="toast" id="shieldToast">能量护盾激活!（免疫1次伤害）</div>
+    <div class="toast" id="spreadToast">散射炮弹激活!</div>
+    <div class="toast" id="flareResetToast">热诱弹冷却重置!</div>
+    <div class="toast" id="flareToast">热诱弹清除所有敌弹和自杀式攻击机!</div>
+    <div class="toast" id="damageToast">受到伤害!</div>
+    <div class="toast" id="bombPlaneToast">炸弹小飞机已发射！撞击最近敌机！</div>
+    <div class="toast" id="overloadToast">过载引擎激活！速度永久翻倍！</div> <!-- 变更提示 -->
+    <div class="toast" id="empToast">EMP炸弹投放！敌机已瘫痪10秒！</div> <!-- 变更提示 -->
+    <div class="toast" id="missileMultiKillToast">导弹连击！得分翻倍！</div>
+    <div class="toast" id="weaponBoostToast">武器强化激活！伤害提升！</div>
+    <div class="toast" id="healthToast">生命+1!</div>
+    <div class="toast" id="overloadUsedToast">过载引擎已使用（仅可使用一次）</div> <!-- 新增提示 -->
+
+    <div id="abilityCDs">
+        <div class="ability-item">
+            <div class="ability-key">E</div>
+            <div>炸弹小飞机</div>
+            <div class="ability-cd" id="bombPlaneCD">就绪</div>
+        </div>
+        <div class="ability-item">
+            <div class="ability-key">R</div>
+            <div>激活护盾</div> <!-- 变更描述 -->
+            <div class="ability-cd" id="laserCD">就绪</div>
+        </div>
+        <div class="ability-item">
+            <div class="ability-key">F</div>
+            <div>过载引擎(永久)</div> <!-- 变更描述 -->
+            <div class="ability-cd" id="overloadCD">就绪</div>
+        </div>
+        <div class="ability-item">
+            <div class="ability-key">Q</div>
+            <div>EMP炸弹(10s)</div> <!-- 变更描述 -->
+            <div class="ability-cd" id="empCD">就绪</div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var canvas = document.getElementById('gameCanvas');
+            var ctx = canvas.getContext('2d');
+            
+            function resizeCanvas() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+                if (gameState && gameState.playing) {
+                    gameState.player.x = Math.min(gameState.player.x, canvas.width - 50);
+                    gameState.player.y = Math.min(gameState.player.y, canvas.height - 80);
+                }
+                generateStars();
+            }
+            
+            let stars = [];
+            function generateStars() {
+                stars = [];
+                for (let i = 0; i < 200; i++) {
+                    stars.push({
+                        x: Math.random() * canvas.width,
+                        y: Math.random() * canvas.height,
+                        radius: Math.random() * 1.5,
+                        speed: Math.random() * 0.5 + 0.1,
+                        opacity: Math.random() * 0.8 + 0.2
+                    });
+                }
+            }
+            
+            function drawStars() {
+                stars.forEach(star => {
+                    star.y += star.speed;
+                    if (star.y > canvas.height) {
+                        star.y = 0;
+                        star.x = Math.random() * canvas.width;
+                    }
+                    
+                    ctx.beginPath();
+                    ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(255, 255, 255, ${star.opacity})`;
+                    ctx.fill();
+                });
+            }
+            
+            var gameState = {
+                playing: false,
+                paused: false,
+                score: 0,
+                level: 1,
+                gameTime: 0,
+                lastShotTime: 0,
+                player: {
+                    x: 0,
+                    y: 0,
+                    size: 40,
+                    speed: 600,
+                    baseSpeed: 600,
+                    missiles: 10,
+                    hasShield: false,
+                    spreadActive: false,
+                    spreadEndTime: 0,
+                    flareCD: 0,
+                    invulnerable: false,
+                    invulnTimer: 0,
+                    health: 3,
+                    overloadActive: false,
+                    overloadUsed: false, // 新增：标记过载是否已使用
+                    weaponBoostActive: false,
+                    weaponBoostEndTime: 0
+                },
+                enemies: [],
+                bullets: [],
+                enemyBullets: [],
+                homingBullets: [],
+                missiles: [],
+                powerups: [],
+                explosions: [],
+                lastFrameTime: 0,
+                bombPlanes: [],
+                abilities: {
+                    bombPlane: { cd: 0, cooldown: 0 },
+                    shield: { cd: 0, cooldown: 0 }, // 变更：原laser改为shield
+                    overload: { cd: 0, cooldown: 0 },
+                    emp: { cd: 0, cooldown: 0 }
+                },
+                empActive: false,
+                empEndTime: 0,
+                missileKillStreak: 0
+            };
+
+            var keys = { a: false, w: false, s: false, d: false };
+            var mouse = { down: false, x: 0, y: 0 };
+
+            const startBtn = document.getElementById('startBtn');
+            if (startBtn) {
+                startBtn.addEventListener('click', function() {
+                    document.getElementById('startScreen').style.display = 'none';
+                    initGame();
+                });
+            }
+
+            document.getElementById('resumeBtn').onclick = function() {
+                gameState.paused = false;
+                document.getElementById('pauseScreen').style.display = 'none';
+                gameState.lastFrameTime = performance.now();
+                gameLoop();
+            };
+
+            document.getElementById('quitBtn').onclick = function() {
+                gameState.playing = false;
+                gameState.paused = false;
+                document.getElementById('pauseScreen').style.display = 'none';
+                document.getElementById('startScreen').style.display = 'flex';
+                document.getElementById('gameUI').style.display = 'none';
+                document.getElementById('abilityCDs').style.display = 'none';
+            };
+
+            document.getElementById('restartBtn').onclick = function() {
+                document.getElementById('gameOverScreen').style.display = 'none';
+                initGame();
+            };
+
+            document.addEventListener('keydown', function(e) {
+                if (!gameState.playing) return;
+                switch(e.key.toLowerCase()) {
+                    case 'a': keys.a = true; break;
+                    case 'w': keys.w = true; break;
+                    case 's': keys.s = true; break;
+                    case 'd': keys.d = true; break;
+                    case 'p': 
+                        gameState.paused = !gameState.paused;
+                        if (gameState.paused) {
+                            document.getElementById('pauseScreen').style.display = 'flex';
+                        } else {
+                            document.getElementById('pauseScreen').style.display = 'none';
+                            gameLoop();
+                        }
+                        break;
+                    case 'y': useFlare(); break;
+                    case 'e': 
+                        if (canUseAbility('bombPlane') && gameState.score >= 500) {
+                            summonBombPlane();
+                        }
+                        break;
+                    case 'r': 
+                        if (canUseAbility('shield') && gameState.score >= 1000) { // 变更：激光改为护盾
+                            activateShield();
+                        }
+                        break;
+                    case 'f': 
+                        if (canUseAbility('overload') && gameState.score >= 800 && !gameState.player.overloadUsed) { // 新增：检查是否已使用
+                            activateOverload();
+                        } else if (gameState.player.overloadUsed) {
+                            showToast('overloadUsedToast'); // 提示已使用
+                        }
+                        break;
+                    case 'q': 
+                        if (canUseAbility('emp') && gameState.score >= 700) {
+                            activateEMP();
+                        }
+                        break;
+                }
+            });
+
+            document.addEventListener('keyup', function(e) {
+                switch(e.key.toLowerCase()) {
+                    case 'a': keys.a = false; break;
+                    case 'w': keys.w = false; break;
+                    case 's': keys.s = false; break;
+                    case 'd': keys.d = false; break;
+                }
+            });
+
+            canvas.addEventListener('mousemove', function(e) {
+                var rect = canvas.getBoundingClientRect();
+                mouse.x = e.clientX - rect.left;
+                mouse.y = e.clientY - rect.top;
+            });
+
+            canvas.onmousedown = function(e) {
+                if (!gameState.playing || gameState.paused) return;
+                if (e.button === 0) { 
+                    mouse.down = true;
+                    if (Date.now() - gameState.lastShotTime >= 50) {
+                        fireBullets();
+                        gameState.lastShotTime = Date.now();
+                    }
+                } else if (e.button === 2) { 
+                    if (gameState.player.missiles > 0) {
+                        gameState.missiles.push({
+                            x: gameState.player.x,
+                            y: gameState.player.y - 30,
+                            size: 6,
+                            speed: 1200,
+                            target: null,
+                            maxTurnSpeed: 3.5,
+                            lastTargetUpdate: 0,
+                            targetUpdateInterval: 300,
+                            isClusterMissile: false // 标记是否为集群导弹
+                        });
+                        gameState.player.missiles--;
+                        document.getElementById('missiles').textContent = gameState.player.missiles;
+                    }
+                }
+            };
+
+            canvas.onmouseup = function(e) {
+                if (e.button === 0) mouse.down = false;
+            };
+
+            canvas.oncontextmenu = function(e) { e.preventDefault(); };
+
+            function fireBullets() {
+                const bulletSize = gameState.player.weaponBoostActive ? 6 : 4;
+                const bulletSpeed = gameState.player.weaponBoostActive ? 1800 : 1500;
+                const bulletDamage = gameState.player.weaponBoostActive ? 2 : 1;
+
+                if (gameState.player.spreadActive) {
+                    gameState.bullets.push({ 
+                        x: gameState.player.x - 20, 
+                        y: gameState.player.y - 10, 
+                        size: bulletSize, 
+                        speed: bulletSpeed, 
+                        dx: -1,
+                        damage: bulletDamage
+                    });
+                    gameState.bullets.push({ 
+                        x: gameState.player.x, 
+                        y: gameState.player.y - 10, 
+                        size: bulletSize, 
+                        speed: bulletSpeed, 
+                        dx: 0,
+                        damage: bulletDamage
+                    });
+                    gameState.bullets.push({ 
+                        x: gameState.player.x + 20, 
+                        y: gameState.player.y - 10, 
+                        size: bulletSize, 
+                        speed: bulletSpeed, 
+                        dx: 1,
+                        damage: bulletDamage
+                    });
+                } else {
+                    gameState.bullets.push({ 
+                        x: gameState.player.x - 20, 
+                        y: gameState.player.y - 10, 
+                        size: bulletSize, 
+                        speed: bulletSpeed, 
+                        dx: 0,
+                        damage: bulletDamage
+                    });
+                    gameState.bullets.push({ 
+                        x: gameState.player.x + 20, 
+                        y: gameState.player.y - 10, 
+                        size: bulletSize, 
+                        speed: bulletSpeed, 
+                        dx: 0,
+                        damage: bulletDamage
+                    });
+                }
+            }
+
+            function canUseAbility(abilityName) {
+                return true;
+            }
+
+            function updateAbilityCDs() {
+                Object.keys(gameState.abilities).forEach(ability => {
+                    var elem = document.getElementById(ability + 'CD') || document.getElementById(
+                        ability === 'shield' ? 'laserCD' : ability + 'CD' // 兼容原激光CD元素
+                    );
+                    elem.textContent = '就绪';
+                    elem.style.color = '#2ecc71';
+                });
+            }
+
+            function summonBombPlane() {
+                gameState.score -= 500;
+                document.getElementById('score').textContent = gameState.score;
+                
+                gameState.bombPlanes.push({
+                    x: gameState.player.x,
+                    y: gameState.player.y,
+                    size: 20,
+                    speed: 1000,
+                    target: null,
+                    explosionRadius: 0,
+                    maxExplosionRadius: 10,
+                    stage: 0,
+                    spawnTime: Date.now(),
+                    lifetime: 8000
+                });
+                
+                showToast('bombPlaneToast');
+            }
+
+            // 新增：激活护盾（替代原全屏激光）
+            function activateShield() {
+                gameState.score -= 1000;
+                document.getElementById('score').textContent = gameState.score;
+                
+                gameState.player.hasShield = true;
+                document.getElementById('shieldIcon').style.display = 'block';
+                
+                showToast('shieldToast');
+            }
+
+            function drawBombPlane(plane) {
+                ctx.save();
+                ctx.translate(plane.x, plane.y);
+                
+                if (plane.stage === 0) {
+                    ctx.fillStyle = '#e74c3c';
+                    ctx.beginPath();
+                    ctx.moveTo(0, -plane.size);
+                    ctx.lineTo(-plane.size/2, plane.size/2);
+                    ctx.lineTo(plane.size/2, plane.size/2);
+                    ctx.closePath();
+                    ctx.fill();
+                    
+                    ctx.fillStyle = 'rgba(255, 107, 107, 0.6)';
+                    ctx.beginPath();
+                    ctx.moveTo(-plane.size/4, plane.size/2);
+                    ctx.lineTo(0, plane.size);
+                    ctx.lineTo(plane.size/4, plane.size/2);
+                    ctx.closePath();
+                    ctx.fill();
+                } else {
+                    ctx.fillStyle = '#ff6b6b';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, plane.explosionRadius, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.fillStyle = '#ffdd59';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, plane.explosionRadius * 0.6, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                ctx.restore();
+            }
+
+            // 变更：过载引擎永久生效，仅一次
+            function activateOverload() {
+                gameState.score -= 800;
+                document.getElementById('score').textContent = gameState.score;
+                
+                gameState.player.overloadActive = true;
+                gameState.player.overloadUsed = true; // 标记已使用
+                gameState.player.speed = gameState.player.baseSpeed * 2; // 永久翻倍
+                
+                document.getElementById('overloadIcon').style.display = 'block';
+                
+                showToast('overloadToast');
+            }
+
+            // 变更：EMP时长改为10秒
+            function activateEMP() {
+                gameState.score -= 700;
+                document.getElementById('score').textContent = gameState.score;
+                
+                gameState.empActive = true;
+                gameState.empEndTime = Date.now() + 10000; // 10秒
+                
+                gameState.enemies.forEach(enemy => {
+                    enemy.empParalyzed = true;
+                    enemy.originalSpeed = enemy.speed;
+                    enemy.speed = 0;
+                    enemy.stopFiring = true;
+                });
+                
+                gameState.homingBullets = [];
+                
+                ctx.save();
+                const empGradient = ctx.createRadialGradient(
+                    canvas.width/2, canvas.height/2, 0,
+                    canvas.width/2, canvas.height/2, Math.max(canvas.width, canvas.height)
+                );
+                empGradient.addColorStop(0, 'rgba(0, 255, 255, 0.5)');
+                empGradient.addColorStop(0.5, 'rgba(0, 255, 255, 0.2)');
+                empGradient.addColorStop(1, 'rgba(0, 255, 255, 0)');
+                ctx.fillStyle = empGradient;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.restore();
+                
+                showToast('empToast');
+            }
+
+            function initGame() {
+                resizeCanvas();
+                
+                gameState.playing = true;
+                gameState.paused = false;
+                gameState.score = 0;
+                gameState.level = 1;
+                gameState.gameTime = 0;
+                gameState.lastFrameTime = performance.now();
+                gameState.lastShotTime = 0;
+                gameState.empActive = false;
+                gameState.empEndTime = 0;
+                gameState.missileKillStreak = 0;
+                
+                gameState.player = {
+                    x: canvas.width/2,
+                    y: canvas.height - 120,
+                    size: 40,
+                    speed: 600,
+                    baseSpeed: 600,
+                    missiles: 10,
+                    hasShield: false,
+                    spreadActive: false,
+                    spreadEndTime: 0,
+                    flareCD: 0,
+                    invulnerable: false,
+                    invulnTimer: 0,
+                    health: 3,
+                    overloadActive: false,
+                    overloadUsed: false, // 初始化未使用
+                    weaponBoostActive: false,
+                    weaponBoostEndTime: 0
+                };
+                
+                Object.keys(gameState.abilities).forEach(ability => {
+                    gameState.abilities[ability].cd = 0;
+                });
+                
+                Object.keys(keys).forEach(key => keys[key] = false);
+                mouse.down = false;
+                
+                gameState.enemies = [];
+                gameState.bullets = [];
+                gameState.enemyBullets = [];
+                gameState.homingBullets = [];
+                gameState.missiles = [];
+                gameState.powerups = [];
+                gameState.explosions = [];
+                gameState.bombPlanes = [];
+                
+                document.getElementById('gameUI').style.display = 'flex';
+                document.getElementById('abilityCDs').style.display = 'flex';
+                document.getElementById('score').textContent = '0';
+                document.getElementById('level').textContent = '1';
+                document.getElementById('missiles').textContent = '10';
+                document.getElementById('health').textContent = '3';
+                document.getElementById('shieldIcon').style.display = 'none';
+                document.getElementById('spreadIcon').style.display = 'none';
+                document.getElementById('overloadIcon').style.display = 'none';
+                document.getElementById('weaponBoostIcon').style.display = 'none';
+                document.getElementById('flareCDText').textContent = '就绪';
+                
+                spawnEnemy();
+                requestAnimationFrame(gameLoop);
+            }
+
+            function spawnEnemy() {
+                if (!gameState.playing || gameState.paused) return;
+                
+                var enemyX = Math.random() * (canvas.width - 100) + 50;
+                var eliteChance = Math.min(0.2, gameState.level * 0.02);
+                var isElite = Math.random() < eliteChance;
+                
+                var types = isElite ? ['elite'] : ['sentinel', 'raider', 'shieldship', 'cannon'];
+                var type = types[Math.floor(Math.random() * types.length)];
+                
+                var props = {
+                    sentinel: { size: 30, speed: 300 + (gameState.level * 20), health: 1, points: 10, drop: 'missile', canShoot: true, shotInterval: 6000, homing: true },
+                    raider: { 
+                        size: 25, 
+                        speed: 800 + (gameState.level * 50),
+                        health: 1, 
+                        points: 20, 
+                        drop: 'cluster', 
+                        canShoot: false,
+                        homing: false,
+                        isSuicide: true
+                    },
+                    shieldship: { size: 40, speed: 200 + (gameState.level * 10), health: 3, shieldHealth: 50, points: 40, drop: 'shield', canShoot: false },
+                    cannon: { size: 35, speed: 300 + (gameState.level * 20), health: 2, points: 25, drop: 'spread', shotInterval: 500, canShoot: true, homing: false },
+                    elite: { 
+                        size: 45, 
+                        speed: 300,
+                        health: 8, 
+                        points: 100, 
+                        drop: 'energyCore', 
+                        canShoot: true, 
+                        shotInterval: 3000, 
+                        homing: false,
+                        shieldHealth: 30,
+                        topShooter: true
+                    }
+                };
+                
+                const initialY = type === 'elite' ? 60 : -60;
+                gameState.enemies.push({ x: enemyX, y: initialY, type: type, ...props[type], lastShot: 0, stopFiring: false });
+                
+                var spawnRate = Math.max(800, 2000 - (gameState.level * 100));
+                setTimeout(spawnEnemy, spawnRate);
+            }
+
+            function spawnPowerup(x, y, type) {
+                gameState.powerups.push({
+                    x: x, y: y, size: 15, type: type,
+                    color: type === 'missile' ? '#ffdd59' : 
+                           type === 'cluster' ? '#9b59b6' : 
+                           type === 'shield' ? '#1e90ff' : 
+                           type === 'spread' ? '#2ecc71' : 
+                           type === 'energyCore' ? '#ff6b6b' : 
+                           type === 'health' ? '#4cd137' : '#e74c3c',
+                    float: 0, floatSpeed: Math.random() * 0.05 + 0.03
+                });
+            }
+
+            function checkCollision(a, b) {
+                var dx = a.x - b.x;
+                var dy = a.y - b.y;
+                return Math.sqrt(dx * dx + dy * dy) < (a.size + b.size);
+            }
+
+            function useFlare() {
+                gameState.enemyBullets = [];
+                gameState.homingBullets = [];
+                
+                let removedCount = 0;
+                for (let i = gameState.enemies.length - 1; i >= 0; i--) {
+                    if (gameState.enemies[i].type === 'raider') {
+                        drawExplosion(gameState.enemies[i].x, gameState.enemies[i].y, gameState.enemies[i].size * 2);
+                        spawnPowerup(gameState.enemies[i].x, gameState.enemies[i].y, gameState.enemies[i].drop);
+                        if (Math.random() < 0.15) {
+                            spawnPowerup(gameState.enemies[i].x, gameState.enemies[i].y, 'health');
+                        }
+                        gameState.score += gameState.enemies[i].points * 10;
+                        document.getElementById('score').textContent = gameState.score;
+                        gameState.enemies.splice(i, 1);
+                        removedCount++;
+                    }
+                }
+                
+                showToast('flareToast');
+                updateFlareCD();
+            }
+
+            function updateFlareCD() {
+                document.getElementById('flareCDText').textContent = '就绪';
+            }
+
+            function showToast(id) {
+                var toast = document.getElementById(id);
+                toast.style.transform = 'translateX(0)';
+                setTimeout(() => toast.style.transform = 'translateX(120%)', 2000);
+            }
+
+            function drawWolfhound(x, y) {
+                ctx.save();
+                ctx.translate(x, y);
+                
+                if (gameState.player.invulnerable && Math.floor(Date.now() / 100) % 2 === 0) {
+                    ctx.globalAlpha = 0.5;
+                }
+                
+                ctx.fillStyle = '#2d3436';
+                ctx.beginPath();
+                ctx.moveTo(0, -30);
+                ctx.lineTo(-25, 10);
+                ctx.lineTo(-15, 40);
+                ctx.lineTo(15, 40);
+                ctx.lineTo(25, 10);
+                ctx.closePath();
+                ctx.fill();
+                
+                ctx.fillStyle = gameState.player.weaponBoostActive ? '#9b59b6' : '#636e72';
+                ctx.beginPath();
+                ctx.moveTo(-25, 10);
+                ctx.lineTo(-50, 0);
+                ctx.lineTo(-40, 20);
+                ctx.lineTo(-15, 15);
+                ctx.closePath();
+                ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(25, 10);
+                ctx.lineTo(50, 0);
+                ctx.lineTo(40, 20);
+                ctx.lineTo(15, 15);
+                ctx.closePath();
+                ctx.fill();
+                
+                ctx.fillStyle = '#0984e3';
+                ctx.beginPath();
+                ctx.ellipse(0, -10, 12, 15, 0, 0, Math.PI * 2);
+                ctx.fill();
+                
+                if (gameState.player.overloadActive) {
+                    ctx.fillStyle = '#ff3333';
+                    ctx.beginPath();
+                    ctx.moveTo(-15, 40);
+                    ctx.lineTo(-8, 65);
+                    ctx.lineTo(8, 65);
+                    ctx.lineTo(15, 40);
+                    ctx.closePath();
+                    ctx.fill();
+                } else {
+                    ctx.fillStyle = '#d63031';
+                    ctx.beginPath();
+                    ctx.moveTo(-10, 40);
+                    ctx.lineTo(-5, 55);
+                    ctx.lineTo(5, 55);
+                    ctx.lineTo(10, 40);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+                
+                ctx.fillStyle = '#fdcb6e';
+                ctx.fillRect(-45, 5, 10, 10);
+                ctx.fillRect(35, 5, 10, 10);
+                
+                if (gameState.player.hasShield) {
+                    ctx.strokeStyle = '#1e90ff';
+                    ctx.lineWidth = 3;
+                    ctx.setLineDash([3, 2]);
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 50, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    ctx.fillStyle = 'rgba(30, 144, 255, 0.1)';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 50 + Math.sin(Date.now() * 0.005) * 5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                if (gameState.player.weaponBoostActive) {
+                    ctx.strokeStyle = '#9b59b6';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(0, -20, 30, 0, Math.PI * 2);
+                    ctx.stroke();
+                    
+                    for (let i = 0; i < 8; i++) {
+                        const angle = (i / 8) * Math.PI * 2;
+                        const dist = 30 + Math.sin(Date.now() * 0.01 + i) * 3;
+                        ctx.fillStyle = 'rgba(155, 89, 182, 0.7)';
+                        ctx.beginPath();
+                        ctx.arc(
+                            Math.cos(angle) * dist, 
+                            Math.sin(angle) * dist - 20, 
+                            2, 0, Math.PI * 2
+                        );
+                        ctx.fill();
+                    }
+                }
+                
+                ctx.restore();
+            }
+
+            function drawEnemy(enemy) {
+                ctx.save();
+                ctx.translate(enemy.x, enemy.y);
+                
+                if (enemy.empParalyzed) {
+                    ctx.strokeStyle = 'rgba(0, 255, 255, 0.8)';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, enemy.size + 10, 0, Math.PI * 2);
+                    ctx.stroke();
+                    if (Math.floor(Date.now() / 300) % 2 === 0) {
+                        ctx.fillStyle = 'rgba(0, 255, 255, 0.2)';
+                        ctx.beginPath();
+                        ctx.arc(0, 0, enemy.size, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+                
+                if (enemy.type === 'raider' && !enemy.empParalyzed) {
+                    ctx.strokeStyle = '#ff3333';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([2, 2]);
+                    ctx.beginPath();
+                    ctx.arc(0, 0, enemy.size + 8, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+                
+                const lockedMissiles = gameState.missiles.filter(m => m.target === enemy);
+                if (lockedMissiles.length > 0) {
+                    ctx.strokeStyle = '#ffdd59';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([2, 3]);
+                    ctx.beginPath();
+                    ctx.arc(0, 0, enemy.size + 15, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+                
+                switch(enemy.type) {
+                    case 'sentinel': 
+                        ctx.fillStyle = '#2d3436';
+                        ctx.beginPath();
+                        ctx.moveTo(0, -enemy.size);
+                        ctx.lineTo(enemy.size, 0);
+                        ctx.lineTo(0, enemy.size);
+                        ctx.lineTo(-enemy.size, 0);
+                        ctx.closePath();
+                        ctx.fill();
+                        ctx.fillStyle = '#e74c3c';
+                        ctx.beginPath();
+                        ctx.arc(0, 0, enemy.size/3, 0, Math.PI*2);
+                        ctx.fill();
+                        ctx.fillStyle = '#636e72';
+                        ctx.fillRect(-enemy.size*1.2, -enemy.size/4, enemy.size*0.4, enemy.size/2);
+                        ctx.fillRect(enemy.size*0.8, -enemy.size/4, enemy.size*0.4, enemy.size/2);
+                        break;
+                        
+                    case 'raider': 
+                        ctx.fillStyle = '#e74c3c';
+                        ctx.beginPath();
+                        ctx.moveTo(0, -enemy.size);
+                        ctx.lineTo(enemy.size, enemy.size);
+                        ctx.lineTo(-enemy.size, enemy.size);
+                        ctx.closePath();
+                        ctx.fill();
+                        ctx.fillStyle = '#c0392b';
+                        ctx.beginPath();
+                        ctx.moveTo(0, -enemy.size/2);
+                        ctx.lineTo(enemy.size*0.7, enemy.size*0.7);
+                        ctx.lineTo(-enemy.size*0.7, enemy.size*0.7);
+                        ctx.closePath();
+                        ctx.fill();
+                        ctx.fillStyle = '#ff6b6b';
+                        ctx.beginPath();
+                        ctx.ellipse(0, enemy.size*0.5, enemy.size/3, enemy.size/5, 0, 0, Math.PI*2);
+                        ctx.fill();
+                        break;
+                        
+                    case 'shieldship': 
+                        ctx.fillStyle = '#2d3436';
+                        ctx.fillRect(-enemy.size, -enemy.size/2, enemy.size*2, enemy.size);
+                        ctx.fillStyle = '#1a1a1a';
+                        ctx.fillRect(-enemy.size*1.2, -enemy.size/2, enemy.size*0.4, enemy.size);
+                        if (enemy.shieldHealth > 0) {
+                            ctx.strokeStyle = '#1e90ff';
+                            ctx.lineWidth = 3;
+                            ctx.setLineDash([5, 3]);
+                            ctx.beginPath();
+                            ctx.arc(0, 0, enemy.size + 15, 0, Math.PI * 2);
+                            ctx.stroke();
+                            ctx.setLineDash([]);
+                            ctx.fillStyle = 'rgba(30, 144, 255, 0.3)';
+                            ctx.beginPath();
+                            ctx.arc(0, 0, enemy.size + 15 - (50 - enemy.shieldHealth)/3, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                        ctx.fillStyle = '#1e90ff';
+                        ctx.beginPath();
+                        ctx.arc(0, 0, enemy.size/4, 0, Math.PI*2);
+                        ctx.fill();
+                        break;
+                        
+                    case 'cannon': 
+                        ctx.fillStyle = '#2d3436';
+                        ctx.beginPath();
+                        ctx.ellipse(0, 0, enemy.size/1.5, enemy.size, 0, 0, Math.PI*2);
+                        ctx.fill();
+                        ctx.fillStyle = '#636e72';
+                        ctx.fillRect(-enemy.size*1.5, -enemy.size/5, enemy.size*0.8, enemy.size/3);
+                        ctx.fillRect(enemy.size*0.7, -enemy.size/5, enemy.size*0.8, enemy.size/3);
+                        ctx.fillStyle = '#ff6b6b';
+                        ctx.beginPath();
+                        ctx.ellipse(-enemy.size*1.9, 0, enemy.size/5, enemy.size/5, 0, 0, Math.PI*2);
+                        ctx.ellipse(enemy.size*1.1, 0, enemy.size/5, enemy.size/5, 0, 0, Math.PI*2);
+                        ctx.fill();
+                        ctx.fillStyle = '#2ecc71';
+                        ctx.beginPath();
+                        ctx.arc(0, 0, enemy.size/4, 0, Math.PI*2);
+                        ctx.fill();
+                        break;
+                        
+                    case 'elite':
+                        if (enemy.shieldHealth > 0) {
+                            ctx.strokeStyle = '#ff6b6b';
+                            ctx.lineWidth = 4;
+                            ctx.setLineDash([6, 4]);
+                            ctx.beginPath();
+                            ctx.arc(0, 0, enemy.size + 20, 0, Math.PI * 2);
+                            ctx.stroke();
+                            ctx.setLineDash([]);
+                            ctx.fillStyle = 'rgba(255, 107, 107, 0.2)';
+                            ctx.beginPath();
+                            ctx.arc(0, 0, enemy.size + 20 - (30 - enemy.shieldHealth)/2, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                        
+                        ctx.fillStyle = '#2c3e50';
+                        ctx.beginPath();
+                        ctx.moveTo(0, -enemy.size);
+                        ctx.lineTo(enemy.size*0.8, enemy.size*0.3);
+                        ctx.lineTo(enemy.size*0.3, enemy.size);
+                        ctx.lineTo(-enemy.size*0.3, enemy.size);
+                        ctx.lineTo(-enemy.size*0.8, enemy.size*0.3);
+                        ctx.closePath();
+                        ctx.fill();
+                        
+                        ctx.fillStyle = '#e74c3c';
+                        ctx.beginPath();
+                        ctx.arc(0, 0, enemy.size/3, 0, Math.PI*2);
+                        ctx.fill();
+                        
+                        ctx.fillStyle = '#34495e';
+                        ctx.beginPath();
+                        ctx.moveTo(-enemy.size*0.8, enemy.size*0.3);
+                        ctx.lineTo(-enemy.size*1.5, 0);
+                        ctx.lineTo(-enemy.size*0.8, -enemy.size*0.3);
+                        ctx.closePath();
+                        ctx.fill();
+                        ctx.beginPath();
+                        ctx.moveTo(enemy.size*0.8, enemy.size*0.3);
+                        ctx.lineTo(enemy.size*1.5, 0);
+                        ctx.lineTo(enemy.size*0.8, -enemy.size*0.3);
+                        ctx.closePath();
+                        ctx.fill();
+                        
+                        ctx.fillStyle = '#f1c40f';
+                        ctx.fillRect(-enemy.size*0.2, -enemy.size*0.7, enemy.size*0.4, enemy.size*0.2);
+                        break;
+                }
+                
+                ctx.restore();
+            }
+
+            function drawExplosion(x, y, size) {
+                ctx.fillStyle = '#ff6b6b';
+                for (var i = 0; i < 20; i++) {
+                    var angle = (i / 20) * Math.PI * 2;
+                    var dist = Math.random() * size;
+                    var px = x + Math.cos(angle) * dist;
+                    var py = y + Math.sin(angle) * dist;
+                    ctx.beginPath();
+                    ctx.arc(px, py, Math.random() * 6 + 3, 0, Math.PI*2);
+                    ctx.fill();
+                }
+                
+                ctx.fillStyle = '#ffdd59';
+                ctx.beginPath();
+                ctx.arc(x, y, size/3, 0, Math.PI*2);
+                ctx.fill();
+                
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                ctx.beginPath();
+                ctx.arc(x, y, size/6, 0, Math.PI*2);
+                ctx.fill();
+            }
+
+            function gameLoop(timestamp) {
+                if (!gameState.playing || gameState.paused) return;
+                
+                if (!gameState.lastFrameTime) gameState.lastFrameTime = timestamp;
+                var deltaTime = (timestamp - gameState.lastFrameTime) / 1000;
+                gameState.lastFrameTime = timestamp;
+                gameState.gameTime += deltaTime * 1000;
+                
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                drawStars();
+                
+                var newLevel = Math.floor(gameState.gameTime / 30000) + 1;
+                if (newLevel > gameState.level) {
+                    gameState.level = newLevel;
+                    document.getElementById('level').textContent = newLevel;
+                }
+                
+                const moveDistance = gameState.player.speed * deltaTime;
+                if (keys.a) gameState.player.x -= moveDistance;
+                if (keys.d) gameState.player.x += moveDistance;
+                if (keys.w) gameState.player.y -= moveDistance;
+                if (keys.s) gameState.player.y += moveDistance;
+                
+                gameState.player.x = Math.max(50, Math.min(canvas.width - 50, gameState.player.x));
+                gameState.player.y = Math.max(50, Math.min(canvas.height - 80, gameState.player.y));
+                
+                var now = Date.now();
+                
+                if (gameState.player.invulnerable && now > gameState.player.invulnTimer) {
+                    gameState.player.invulnerable = false;
+                }
+                
+                if (mouse.down && (now - gameState.lastShotTime >= 50)) {
+                    fireBullets();
+                    gameState.lastShotTime = now;
+                }
+                
+                if (gameState.player.spreadActive) {
+                    if (now > gameState.player.spreadEndTime) {
+                        gameState.player.spreadActive = false;
+                        document.getElementById('spreadIcon').style.display = 'none';
+                    } else {
+                        var spreadLeft = Math.ceil((gameState.player.spreadEndTime - now) / 1000);
+                        document.getElementById('spreadTimer').textContent = spreadLeft + 's';
+                    }
+                }
+                
+                // 移除过载引擎的结束判断（永久生效）
+                if (gameState.player.overloadActive) {
+                    document.getElementById('overloadIcon').style.display = 'block';
+                }
+                
+                if (gameState.player.weaponBoostActive) {
+                    if (now > gameState.player.weaponBoostEndTime) {
+                        gameState.player.weaponBoostActive = false;
+                        document.getElementById('weaponBoostIcon').style.display = 'none';
+                    } else {
+                        var boostLeft = Math.ceil((gameState.player.weaponBoostEndTime - now) / 1000);
+                        document.getElementById('weaponBoostTimer').textContent = boostLeft + 's';
+                    }
+                }
+                
+                if (gameState.empActive && now > gameState.empEndTime) {
+                    gameState.empActive = false;
+                    gameState.enemies.forEach(enemy => {
+                        if (enemy.empParalyzed) {
+                            enemy.empParalyzed = false;
+                            enemy.speed = enemy.originalSpeed || enemy.speed;
+                            enemy.stopFiring = false;
+                        }
+                    });
+                }
+                
+                updateAbilityCDs();
+                updateFlareCD();
+                
+                drawWolfhound(gameState.player.x, gameState.player.y);
+                
+                for (let i = gameState.bombPlanes.length - 1; i >= 0; i--) {
+                    let plane = gameState.bombPlanes[i];
+                    const currentTime = Date.now();
+                    
+                    if (currentTime - plane.spawnTime > plane.lifetime) {
+                        gameState.bombPlanes.splice(i, 1);
+                        continue;
+                    }
+                    
+                    if (plane.stage === 0) {
+                        if (!plane.target || !gameState.enemies.includes(plane.target)) {
+                            let closestEnemy = null;
+                            let closestDist = Infinity;
+                            gameState.enemies.forEach(enemy => {
+                                const dist = Math.hypot(enemy.x - plane.x, enemy.y - plane.y);
+                                if (dist < closestDist) {
+                                    closestDist = dist;
+                                    closestEnemy = enemy;
+                                }
+                            });
+                            plane.target = closestEnemy;
+                        }
+                        
+                        if (plane.target) {
+                            const dx = plane.target.x - plane.x;
+                            const dy = plane.target.y - plane.y;
+                            const angle = Math.atan2(dy, dx);
+                            
+                            plane.x += Math.cos(angle) * plane.speed * deltaTime;
+                            plane.y += Math.sin(angle) * plane.speed * deltaTime;
+                            
+                            const distance = Math.hypot(plane.target.x - plane.x, plane.target.y - plane.y);
+                            if (distance < plane.maxExplosionRadius) {
+                                plane.stage = 1;
+                                
+                                for (let j = gameState.enemies.length - 1; j >= 0; j--) {
+                                    const enemy = gameState.enemies[j];
+                                    const enemyDist = Math.hypot(enemy.x - plane.x, enemy.y - plane.y);
+                                    if (enemyDist < plane.maxExplosionRadius) {
+                                        drawExplosion(enemy.x, enemy.y, enemy.size * 2);
+                                        spawnPowerup(enemy.x, enemy.y, enemy.drop);
+                                        if (Math.random() < 0.15) {
+                                            spawnPowerup(enemy.x, enemy.y, 'health');
+                                        }
+                                        gameState.score += enemy.points * 10;
+                                        document.getElementById('score').textContent = gameState.score;
+                                        gameState.enemies.splice(j, 1);
+                                    }
+                                }
+                            }
+                        } else {
+                            plane.y -= plane.speed * deltaTime;
+                        }
+                    } else {
+                        plane.explosionRadius += 200 * deltaTime;
+                        if (plane.explosionRadius > plane.maxExplosionRadius * 2) {
+                            gameState.bombPlanes.splice(i, 1);
+                        }
+                    }
+                    
+                    drawBombPlane(plane);
+                }
+                
+                for (let i = gameState.enemies.length - 1; i >= 0; i--) {
+                    let enemy = gameState.enemies[i];
+                    
+                    if (enemy.type === 'raider' && !enemy.empParalyzed) {
+                        const dx = gameState.player.x - enemy.x;
+                        const dy = gameState.player.y - enemy.y;
+                        const angle = Math.atan2(dy, dx);
+                        
+                        enemy.x += Math.cos(angle) * enemy.speed * deltaTime;
+                        enemy.y += Math.sin(angle) * enemy.speed * deltaTime;
+                    } else if (!enemy.empParalyzed) {
+                        if (enemy.type !== 'elite') {
+                            enemy.y += enemy.speed * deltaTime;
+                        } else {
+                            const wave = Math.sin(now * 0.003 + enemy.x * 0.01) * 8;
+                            enemy.x += wave * deltaTime * 60;
+                            enemy.x = Math.max(80, Math.min(canvas.width - 80, enemy.x));
+                        }
+                    }
+                    
+                    if (enemy.canShoot && !enemy.stopFiring && now - enemy.lastShot > enemy.shotInterval) {
+                        if (enemy.type === 'elite') {
+                            enemy.lastShot = now;
+                            const dx = gameState.player.x - enemy.x;
+                            const dy = gameState.player.y - enemy.y;
+                            const angle = Math.atan2(dy, dx);
+                            const bulletSpeed = 800;
+                            
+                            gameState.enemyBullets.push({
+                                x: enemy.x,
+                                y: enemy.y + enemy.size,
+                                size: 6,
+                                speed: bulletSpeed,
+                                dx: Math.cos(angle),
+                                dy: Math.sin(angle)
+                            });
+                        } else if (enemy.type !== 'raider') {
+                            enemy.lastShot = now;
+                            
+                            if (enemy.homing) {
+                                const bulletSpeed = enemy.type === 'sentinel' ? 175 : 700;
+                                const bulletLifetime = enemy.type === 'sentinel' ? 5000 : 4000;
+                                const turnSpeed = enemy.type === 'sentinel' ? 0.15 : 0.3;
+                                gameState.homingBullets.push({
+                                    x: enemy.x,
+                                    y: enemy.y + enemy.size,
+                                    size: 5,
+                                    speed: bulletSpeed,
+                                    target: {x: gameState.player.x, y: gameState.player.y},
+                                    maxTurnSpeed: turnSpeed,
+                                    spawnTime: now,
+                                    lifetime: bulletLifetime
+                                });
+                            } else {
+                                gameState.enemyBullets.push({
+                                    x: enemy.x,
+                                    y: enemy.y + enemy.size,
+                                    size: 4,
+                                    speed: 800,
+                                    dx: 0,
+                                    dy: 1
+                                });
+                            }
+                        }
+                    }
+                    
+                    if (enemy.type !== 'elite' && (enemy.y > canvas.height + 100 || enemy.y < -100 || 
+                        enemy.x < -50 || enemy.x > canvas.width + 50)) {
+                        gameState.enemies.splice(i, 1);
+                        continue;
+                    }
+                    
+                    drawEnemy(enemy);
+                }
+                
+                for (let i = gameState.enemyBullets.length - 1; i >= 0; i--) {
+                    let bullet = gameState.enemyBullets[i];
+                    if (bullet.dx !== undefined && bullet.dy !== undefined) {
+                        bullet.x += bullet.dx * bullet.speed * deltaTime;
+                        bullet.y += bullet.dy * bullet.speed * deltaTime;
+                    } else {
+                        bullet.y += bullet.speed * deltaTime;
+                    }
+                    
+                    ctx.fillStyle = bullet.size === 6 ? '#ff3333' : '#e74c3c';
+                    ctx.beginPath();
+                    ctx.arc(bullet.x, bullet.y, bullet.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    if (bullet.y > canvas.height + 20 || bullet.y < -20 ||
+                        bullet.x < -20 || bullet.x > canvas.width + 20) {
+                        gameState.enemyBullets.splice(i, 1);
+                        continue;
+                    }
+                    
+                    if (!gameState.player.invulnerable && !gameState.player.hasShield && 
+                        checkCollision(bullet, gameState.player)) {
+                        gameState.enemyBullets.splice(i, 1);
+                        takeDamage();
+                        break;
+                    } else if (gameState.player.hasShield && checkCollision(bullet, gameState.player)) {
+                        gameState.enemyBullets.splice(i, 1);
+                        gameState.player.hasShield = false;
+                        document.getElementById('shieldIcon').style.display = 'none';
+                        showToast('damageToast');
+                        break;
+                    }
+                }
+                
+                for (let i = gameState.bullets.length - 1; i >= 0; i--) {
+                    let bullet = gameState.bullets[i];
+                    bullet.y -= bullet.speed * deltaTime;
+                    bullet.x += bullet.dx * 200 * deltaTime;
+                    
+                    ctx.fillStyle = gameState.player.weaponBoostActive ? '#ff6b6b' : '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(bullet.x, bullet.y, bullet.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    if (bullet.y < -20) {
+                        gameState.bullets.splice(i, 1);
+                        continue;
+                    }
+                    
+                    for (let j = gameState.enemies.length - 1; j >= 0; j--) {
+                        let enemy = gameState.enemies[j];
+                        if (checkCollision(bullet, enemy)) {
+                            if (enemy.shieldHealth && enemy.shieldHealth > 0) {
+                                enemy.shieldHealth--;
+                                gameState.bullets.splice(i, 1);
+                                break;
+                            }
+                            
+                            enemy.health -= bullet.damage;
+                            gameState.bullets.splice(i, 1);
+                            
+                            if (enemy.health <= 0) {
+                                drawExplosion(enemy.x, enemy.y, enemy.size * 2);
+                                spawnPowerup(enemy.x, enemy.y, enemy.drop);
+                                if (Math.random() < 0.15) {
+                                    spawnPowerup(enemy.x, enemy.y, 'health');
+                                }
+                                gameState.score += enemy.points * 10;
+                                document.getElementById('score').textContent = gameState.score;
+                                gameState.enemies.splice(j, 1);
+                            }
+                            break;
+                        }
+                    }
+                }
+                
+                for (let i = gameState.homingBullets.length - 1; i >= 0; i--) {
+                    let bullet = gameState.homingBullets[i];
+                    
+                    if (now - bullet.spawnTime > bullet.lifetime) {
+                        gameState.homingBullets.splice(i, 1);
+                        continue;
+                    }
+                    
+                    bullet.target.x = gameState.player.x;
+                    bullet.target.y = gameState.player.y;
+                    
+                    const dx = bullet.target.x - bullet.x;
+                    const dy = bullet.target.y - bullet.y;
+                    const angle = Math.atan2(dy, dx);
+                    
+                    if (bullet.currentAngle === undefined) {
+                        bullet.currentAngle = angle;
+                    } else {
+                        const angleDiff = angle - bullet.currentAngle;
+                        const normalizedDiff = ((angleDiff % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+                        const turnAmount = Math.min(bullet.maxTurnSpeed, normalizedDiff);
+                        bullet.currentAngle += normalizedDiff > Math.PI ? -turnAmount : turnAmount;
+                    }
+                    
+                    bullet.x += Math.cos(bullet.currentAngle) * bullet.speed * deltaTime;
+                    bullet.y += Math.sin(bullet.currentAngle) * bullet.speed * deltaTime;
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(bullet.x, bullet.y);
+                    ctx.lineTo(
+                        bullet.x - Math.cos(bullet.currentAngle) * 15,
+                        bullet.y - Math.sin(bullet.currentAngle) * 15
+                    );
+                    ctx.strokeStyle = 'rgba(255, 107, 107, 0.8)';
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+                    
+                    ctx.fillStyle = '#ff6b6b';
+                    ctx.beginPath();
+                    ctx.arc(bullet.x, bullet.y, bullet.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    if (!gameState.player.invulnerable && !gameState.player.hasShield && 
+                        checkCollision(bullet, gameState.player)) {
+                        gameState.homingBullets.splice(i, 1);
+                        takeDamage();
+                        break;
+                    } else if (gameState.player.hasShield && checkCollision(bullet, gameState.player)) {
+                        gameState.homingBullets.splice(i, 1);
+                        gameState.player.hasShield = false;
+                        document.getElementById('shieldIcon').style.display = 'none';
+                        showToast('damageToast');
+                        break;
+                    }
+                }
+                
+                // 变更：火箭集群导弹逻辑（无目标时环绕玩家，伤害为机炮3倍）
+                for (let i = gameState.missiles.length - 1; i >= 0; i--) {
+                    let missile = gameState.missiles[i];
+                    const isCluster = missile.isClusterMissile;
+                    const baseBulletDamage = gameState.player.weaponBoostActive ? 2 : 1;
+                    const missileDamage = isCluster ? baseBulletDamage * 3 : (gameState.player.weaponBoostActive ? 2 : 1);
+                    
+                    if (now - missile.lastTargetUpdate > missile.targetUpdateInterval) {
+                        missile.lastTargetUpdate = now;
+                        let closestEnemy = null;
+                        let closestDist = Infinity;
+                        gameState.enemies.forEach(enemy => {
+                            const dist = Math.hypot(enemy.x - missile.x, enemy.y - missile.y);
+                            if (dist < closestDist) {
+                                closestDist = dist;
+                                closestEnemy = enemy;
+                            }
+                        });
+                        missile.target = closestEnemy;
+                    }
+                    
+                    if (missile.target) {
+                        // 有目标时正常追踪
+                        const dx = missile.target.x - missile.x;
+                        const dy = missile.target.y - missile.y;
+                        const angle = Math.atan2(dy, dx);
+                        
+                        if (missile.currentAngle === undefined) {
+                            missile.currentAngle = angle;
+                        } else {
+                            const angleDiff = angle - missile.currentAngle;
+                            const normalizedDiff = ((angleDiff % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+                            const turnAmount = Math.min(missile.maxTurnSpeed * deltaTime * 60, normalizedDiff);
+                            missile.currentAngle += normalizedDiff > Math.PI ? -turnAmount : turnAmount;
+                        }
+                        
+                        missile.x += Math.cos(missile.currentAngle) * missile.speed * deltaTime;
+                        missile.y += Math.sin(missile.currentAngle) * missile.speed * deltaTime;
+                    } else if (isCluster) {
+                        // 无目标时集群导弹环绕玩家
+                        const orbitRadius = 80; // 环绕半径
+                        const orbitSpeed = 2; // 环绕速度
+                        // 基于导弹索引生成不同角度，保持环绕分布
+                        const baseAngle = (missile.index || 0) * (Math.PI * 2 / 15);
+                        const currentAngle = baseAngle + (now * 0.001) * orbitSpeed;
+                        
+                        missile.x = gameState.player.x + Math.cos(currentAngle) * orbitRadius;
+                        missile.y = gameState.player.y + Math.sin(currentAngle) * orbitRadius;
+                        missile.currentAngle = currentAngle + Math.PI/2; // 朝向外侧
+                    } else {
+                        // 普通导弹无目标时向上飞
+                        missile.y -= missile.speed * deltaTime;
+                    }
+                    
+                    ctx.save();
+                    ctx.translate(missile.x, missile.y);
+                    ctx.rotate(missile.currentAngle || -Math.PI/2);
+                    ctx.fillStyle = isCluster ? '#9b59b6' : '#ffdd59'; // 集群导弹颜色区分
+                    ctx.beginPath();
+                    ctx.moveTo(0, -missile.size * 2);
+                    ctx.lineTo(-missile.size, missile.size);
+                    ctx.lineTo(missile.size, missile.size);
+                    ctx.closePath();
+                    ctx.fill();
+                    
+                    ctx.fillStyle = 'rgba(255, 107, 107, 0.7)';
+                    ctx.beginPath();
+                    ctx.moveTo(-missile.size/2, missile.size);
+                    ctx.lineTo(0, missile.size * 3);
+                    ctx.lineTo(missile.size/2, missile.size);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.restore();
+                    
+                    if (missile.y < -50 || missile.y > canvas.height + 50 || 
+                        missile.x < -50 || missile.x > canvas.width + 50) {
+                        gameState.missiles.splice(i, 1);
+                        continue;
+                    }
+                    
+                    for (let j = gameState.enemies.length - 1; j >= 0; j--) {
+                        let enemy = gameState.enemies[j];
+                        if (checkCollision(missile, enemy)) {
+                            drawExplosion(enemy.x, enemy.y, enemy.size * 2);
+                            spawnPowerup(enemy.x, enemy.y, enemy.drop);
+                            if (Math.random() < 0.15) {
+                                spawnPowerup(enemy.x, enemy.y, 'health');
+                            }
+                            
+                            if (enemy.shieldHealth && enemy.shieldHealth > 0) {
+                                enemy.shieldHealth = 0;
+                                gameState.missiles.splice(i, 1);
+                                break;
+                            }
+                            
+                            gameState.missileKillStreak++;
+                            if (gameState.missileKillStreak >= 3) {
+                                gameState.score += enemy.points * 20;
+                                showToast('missileMultiKillToast');
+                            } else {
+                                gameState.score += enemy.points * 10;
+                            }
+                            document.getElementById('score').textContent = gameState.score;
+                            
+                            // 应用集群导弹的伤害
+                            enemy.health -= missileDamage;
+                            if (enemy.health <= 0) {
+                                gameState.enemies.splice(j, 1);
+                            }
+                            gameState.missiles.splice(i, 1);
+                            break;
+                        }
+                    }
+                }
+                
+                for (let i = gameState.powerups.length - 1; i >= 0; i--) {
+                    let powerup = gameState.powerups[i];
+                    powerup.y += 300 * deltaTime;
+                    powerup.float += powerup.floatSpeed;
+                    
+                    powerup.y += Math.sin(powerup.float) * 0.5;
+                    
+                    ctx.fillStyle = `${powerup.color}80`;
+                    ctx.beginPath();
+                    ctx.arc(powerup.x, powerup.y, powerup.size + 3, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.fillStyle = powerup.color;
+                    ctx.beginPath();
+                    ctx.arc(powerup.x, powerup.y, powerup.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    if (powerup.y > canvas.height + 20) {
+                        gameState.powerups.splice(i, 1);
+                        continue;
+                    }
+                    
+                    if (checkCollision(powerup, gameState.player)) {
+                        switch(powerup.type) {
+                            case 'missile':
+                                gameState.player.missiles = Math.min(10, gameState.player.missiles + 5);
+                                document.getElementById('missiles').textContent = gameState.player.missiles;
+                                showToast('missileToast');
+                                break;
+                            case 'cluster':
+                                showToast('clusterToast');
+                                for (let k = 0; k < 15; k++) {
+                                    const angle = (k - 7) * 0.1;
+                                    gameState.missiles.push({
+                                        x: gameState.player.x + Math.cos(angle) * 30,
+                                        y: gameState.player.y - 30 + Math.sin(angle) * 30,
+                                        size: 6,
+                                        speed: 1200,
+                                        target: null,
+                                        maxTurnSpeed: 3.5,
+                                        lastTargetUpdate: 0,
+                                        targetUpdateInterval: 300,
+                                        isClusterMissile: true, // 标记为集群导弹
+                                        index: k // 用于环绕角度计算
+                                    });
+                                }
+                                break;
+                            case 'shield':
+                                gameState.player.hasShield = true;
+                                document.getElementById('shieldIcon').style.display = 'block';
+                                showToast('shieldToast');
+                                break;
+                            case 'spread':
+                                gameState.player.spreadActive = true;
+                                gameState.player.spreadEndTime = now + 15000;
+                                document.getElementById('spreadIcon').style.display = 'block';
+                                document.getElementById('spreadTimer').textContent = '15s';
+                                showToast('spreadToast');
+                                break;
+                            case 'energyCore':
+                                gameState.player.weaponBoostActive = true;
+                                gameState.player.weaponBoostEndTime = now + 8000;
+                                document.getElementById('weaponBoostIcon').style.display = 'block';
+                                document.getElementById('weaponBoostTimer').textContent = '8s';
+                                showToast('weaponBoostToast');
+                                break;
+                            case 'health':
+                                gameState.player.health = Math.min(3, gameState.player.health + 1);
+                                document.getElementById('health').textContent = gameState.player.health;
+                                showToast('healthToast');
+                                break;
+                        }
+                        gameState.powerups.splice(i, 1);
+                    }
+                }
+                
+                for (let i = gameState.enemies.length - 1; i >= 0; i--) {
+                    let enemy = gameState.enemies[i];
+                    if (checkCollision(enemy, gameState.player) && !gameState.player.invulnerable) {
+                        if (gameState.player.hasShield) {
+                            gameState.player.hasShield = false;
+                            document.getElementById('shieldIcon').style.display = 'none';
+                            drawExplosion(enemy.x, enemy.y, enemy.size * 2);
+                            gameState.score += enemy.points * 10;
+                            document.getElementById('score').textContent = gameState.score;
+                            gameState.enemies.splice(i, 1);
+                            showToast('damageToast');
+                        } else {
+                            drawExplosion(enemy.x, enemy.y, enemy.size * 2);
+                            gameState.score += enemy.points * 10;
+                            document.getElementById('score').textContent = gameState.score;
+                            gameState.enemies.splice(i, 1);
+                            
+                            if (enemy.type === 'raider') {
+                                gameState.player.health -= 2;
+                                showToast('damageToast');
+                                showToast('damageToast');
+                            } else {
+                                gameState.player.health -= 1;
+                                showToast('damageToast');
+                            }
+                            document.getElementById('health').textContent = gameState.player.health;
+                            
+                            gameState.player.invulnerable = true;
+                            gameState.player.invulnTimer = Date.now() + 2000;
+                            gameState.missileKillStreak = 0;
+                        }
+                    }
+                }
+                
+                if (gameState.player.health <= 0) {
+                    endGame();
+                    return;
+                }
+                
+                requestAnimationFrame(gameLoop);
+            }
+            
+            function takeDamage() {
+                gameState.player.health--;
+                document.getElementById('health').textContent = gameState.player.health;
+                showToast('damageToast');
+                
+                gameState.player.invulnerable = true;
+                gameState.player.invulnTimer = Date.now() + 2000;
+                
+                gameState.missileKillStreak = 0;
+            }
+            
+            function endGame() {
+                gameState.playing = false;
+                document.getElementById('finalScore').textContent = gameState.score;
+                document.getElementById('finalLevel').textContent = gameState.level;
+                document.getElementById('gameOverScreen').style.display = 'flex';
+                document.getElementById('gameUI').style.display = 'none';
+                document.getElementById('abilityCDs').style.display = 'none';
+            }
+            
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+        });
+    </script>
+</body>
+</html>
